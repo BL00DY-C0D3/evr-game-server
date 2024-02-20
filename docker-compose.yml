@@ -1,0 +1,19 @@
+version: '3'
+services:
+  gameserver:
+    build: .
+    image: evr-game-server:latest
+    ports:
+      - "16794:16794/udp"
+      - "16721:16721/udp"
+
+  sdk-server:
+    image: "us-docker.pkg.dev/agones-images/release/agones-sdk:1.38.0"
+    command: --local -f /gs_config
+    network_mode: service:gameserver
+    configs:
+      - gs_config
+
+configs:
+  gs_config:
+    file: ./dev-gameserver.yaml
