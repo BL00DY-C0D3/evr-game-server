@@ -68,6 +68,7 @@ func (m *LoggerMonitor) Log(timestamp time.Time, frame []byte) error {
 	m.timestamp = timestamp
 	return m.logger.Log(timestamp, frame)
 }
+
 func NewSessionAgent(logger *zap.Logger, workerCount int, queueSize int) *SessionAgent {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -92,7 +93,7 @@ func (s *SessionAgent) Stop() {
 }
 
 func (s *SessionAgent) Consume() error {
-	monitors := make(map[string]LoggerMonitor, 0)
+	monitors := make(map[string]LoggerMonitor)
 	ticker := time.NewTicker(60 * time.Second)
 	for {
 		select {
@@ -102,12 +103,12 @@ func (s *SessionAgent) Consume() error {
 			}
 			return nil
 		case frame := <-s.frameCh:
-
 			m, ok := monitors[frame.SessionID]
 			if !ok {
 				logger, err := NewEchoReplayFrameLogger(fmt.Sprintf("%s.echoreplay", frame.SessionID))
 				if err != nil {
 					s.logger.Error("Failed to create logger", zap.Error(err))
+					continue
 				}
 				monitors[frame.SessionID] = LoggerMonitor{
 					logger:    logger,
@@ -122,12 +123,11 @@ func (s *SessionAgent) Consume() error {
 		case <-ticker.C:
 			for sessionID, m := range monitors {
 				if time.Since(m.timestamp) > 60*time.Second {
+					s.logger.Info("Closing inactive session logger", zap.String("sessionID", sessionID))
 					m.logger.Close()
 					delete(monitors, sessionID)
-					return nil
 				}
 			}
-
 		}
 	}
 }
@@ -147,55 +147,64 @@ func (s *SessionAgent) Poll(url string, frequency int) {
 		logger.Error("Failed to create request", zap.Error(err))
 		return
 	}
-	var start time.Time
+
 	for {
-		start = <-ticker.C
 		select {
 		case <-ctx.Done():
 			logger.Debug("Context cancelled, stopping...")
 			return
-		default:
-		}
+		case <-ticker.C:
+			logger.Debug("Making request...")
 
-		logger.Debug("Making request...")
-
-		resp, err := s.client.Do(request)
-		if err != nil {
-			if isConnectionError(err) {
-				logger.Debug("Connection refused, skipping...")
-			} else {
-				logger.Error("Failed to make request", zap.Error(err))
+			var resp *http.Response
+			for retries := 0; retries < 3; retries++ {
+				resp, err = s.client.Do(request)
+				if err == nil {
+					break
+				}
+				if isConnectionError(err) {
+					logger.Debug("Connection refused, retrying...", zap.Int("retry", retries+1))
+					time.Sleep(time.Second * time.Duration(retries+1)) // Exponential backoff
+				} else {
+					logger.Error("Failed to make request", zap.Error(err))
+					cancel()
+					return
+				}
 			}
-			cancel()
-			return // Return to avoid further processing
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusNotFound {
-			continue
-		}
+			if resp == nil {
+				logger.Error("Failed to get response after retries")
+				return
+			}
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			logger.Error("Failed to read response body", zap.Error(err))
-			return // Return to avoid further processing
-		}
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusNotFound {
+				continue
+			}
 
-		elapsed := time.Since(start)
-		logger.Debug("Request-response time", zap.Duration("elapsed", elapsed))
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				logger.Error("Failed to read response body", zap.Error(err))
+				return
+			}
 
-		// Adjust timing if needed
-		if elapsed > step {
-			logger.Warn("Request-response time exceeds frequency (api might be overloaded)", zap.Duration("elapsed", elapsed), zap.Duration("step", step))
-		}
-		sessionID, err := parseSessionID(body)
-		if err != nil {
-			logger.Error("Failed to parse session ID from session frame", zap.Error(err))
-		}
+			elapsed := time.Since(time.Now())
+			logger.Debug("Request-response time", zap.Duration("elapsed", elapsed))
 
-		s.frameCh <- SessionFrame{
-			SessionID: sessionID,
-			Timestamp: time.Now(),
-			Data:      body,
+			if elapsed > step {
+				logger.Warn("Request-response time exceeds frequency (api might be overloaded)", zap.Duration("elapsed", elapsed), zap.Duration("step", step))
+			}
+
+			sessionID, err := parseSessionID(body)
+			if err != nil {
+				logger.Error("Failed to parse session ID from session frame", zap.Error(err))
+				continue
+			}
+
+			s.frameCh <- SessionFrame{
+				SessionID: sessionID,
+				Timestamp: time.Now(),
+				Data:      body,
+			}
 		}
 	}
 }
@@ -216,7 +225,6 @@ func parseSessionID(data []byte) (string, error) {
 }
 
 func isConnectionError(err error) bool {
-
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
