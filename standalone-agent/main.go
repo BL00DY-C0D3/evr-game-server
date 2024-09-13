@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/echotools/evr-game-wrapper/wrapper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
