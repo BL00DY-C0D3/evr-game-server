@@ -1,6 +1,6 @@
 module github.com/BL00DY-C0D3/evr-game-wrapper/standalone-agent
 
-go 1.22.2
+go 1.15
 
 replace github.com/BL00DY-C0D3/evr-game-wrapper => ../
 
