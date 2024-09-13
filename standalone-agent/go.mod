@@ -1,8 +1,8 @@
-module github.com/echotools/evr-game-wrapper/standalone-agent
+module github.com/BL00DY-C0D3/evr-game-wrapper/standalone-agent
 
 go 1.22.2
 
-replace github.com/echotools/evr-game-wrapper => ../
+replace github.com/BL00DY-C0D3/evr-game-wrapper => ../
 
 require go.uber.org/zap v1.27.0
 
