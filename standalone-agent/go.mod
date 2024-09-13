@@ -4,11 +4,10 @@ go 1.15
 
 replace github.com/BL00DY-C0D3/evr-game-wrapper => ../
 
-require go.uber.org/zap v1.27.0
+require go.uber.org/zap v1.16
 
 require (
 	agones.dev/agones v1.36.0 // indirect
-	github.com/echotools/evr-game-wrapper v0.0.0-00010101000000-000000000000 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
