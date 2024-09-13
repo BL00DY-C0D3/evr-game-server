@@ -3,7 +3,7 @@ package wrapper
 import (
 	"context"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -62,7 +62,7 @@ func (p *APICachingProxy) queryAPI(ctx context.Context) string {
 		p.logger.Println("Evr GET Error:", err)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		p.logger.Println("Evr Read Error:", err)
 	}
