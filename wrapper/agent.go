@@ -204,7 +204,7 @@ func (s *SessionAgent) Poll(url string, frequency int) {
 }
 
 type sessionFrame struct {
-	SessionID string json:"sessionid"
+	SessionID string `json:"sessionid"`
 }
 
 func parseSessionID(data []byte) (string, error) {
