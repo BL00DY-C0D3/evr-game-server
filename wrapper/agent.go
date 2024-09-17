@@ -116,6 +116,9 @@ func (s *SessionAgent) Consume() error {
 				}
 				m = monitors[frame.SessionID]
 			}
+			// Update timestamp on every new frame
+			m.timestamp = frame.Timestamp
+
 			if err := m.logger.Log(frame.Timestamp, frame.Data); err != nil {
 				s.logger.Error("Failed to log frame", zap.Error(err))
 			}
@@ -163,11 +166,11 @@ func (s *SessionAgent) Poll(url string, frequency int) {
 					break
 				}
 				if isConnectionError(err) {
-					logger.Debug("Connection refused, retrying...", zap.Int("retry", retries+1))
+					logger.Debug("Connection refused, retrying...", zap.Int("retry", retries+1), zap.Error(err))
 					time.Sleep(time.Second * time.Duration(retries+1)) // Exponential backoff
 				} else {
-					logger.Error("Failed to make request", zap.Error(err))
-					cancel()
+					logger.Error("Failed to make request, cancelling poll", zap.Error(err))
+					cancel() // Explicitly cancel on critical error
 					return
 				}
 			}
@@ -178,6 +181,7 @@ func (s *SessionAgent) Poll(url string, frequency int) {
 
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusNotFound {
+				logger.Warn("Received 404 Not Found")
 				continue
 			}
 
@@ -191,7 +195,7 @@ func (s *SessionAgent) Poll(url string, frequency int) {
 			logger.Debug("Request-response time", zap.Duration("elapsed", elapsed))
 
 			if elapsed > step {
-				logger.Warn("Request-response time exceeds frequency (api might be overloaded)", zap.Duration("elapsed", elapsed), zap.Duration("step", step))
+				logger.Warn("Request-response time exceeds frequency (API might be overloaded)", zap.Duration("elapsed", elapsed), zap.Duration("step", step))
 			}
 
 			sessionID, err := parseSessionID(body)
