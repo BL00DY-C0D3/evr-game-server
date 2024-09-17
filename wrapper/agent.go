@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil""
 	"net"
 	"net/http"
 	"syscall"
@@ -175,7 +175,7 @@ func (s *SessionAgent) Poll(url string, frequency int) {
 				continue
 			}
 
-			body, err := io.ReadAll(resp.Body)
+			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				logger.Error("Failed to read response body", zap.Error(err))
 				return
