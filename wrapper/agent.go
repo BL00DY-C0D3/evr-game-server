@@ -179,11 +179,11 @@ func (s *SessionAgent) Poll(url string, frequency int) {
 				return
 			}
 
-			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusNotFound {
-				logger.Warn("Received 404 Not Found")
-				continue
-			}
+			//defer resp.Body.Close()
+			//if resp.StatusCode == http.StatusNotFound {
+			//	logger.Warn("Received 404 Not Found")
+			//	continue
+			//}
 
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
